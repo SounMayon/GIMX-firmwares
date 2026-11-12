@@ -19,5 +19,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes make gcc-avr avr-libc binutils-avr
+      - name: Record AVR toolchain versions
+        run: |
+          avr-gcc --version | head -n1
+          dpkg-query -W -f='${binary:Package} ${Version}\n' make gcc-avr avr-libc binutils-avr
       - name: Build EMUG29PS4
         run: make -C EMUG29PS4 clean all
