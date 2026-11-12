@@ -11,7 +11,7 @@ git submodule update --init --recursive
 make -C EMUG29PS4 clean all
 ```
 
-The original build with bundled LUFA `130901` passed before this dependency update. The new LUFA version is built by GitHub Actions before any USB or serial protocol changes.
+The original build with bundled LUFA `130901` passed before this dependency update. The LUFA `170418` build passed in [GitHub Actions run 43324588408](https://github.com/SounMayon/GIMX-firmwares/actions/runs/43324588408) with avr-gcc 14.3.0, avr-libc 2.2.1 and binutils-avr 2.43.50. No USB or serial protocol changes are included in that build.
 
 The firmware relays G29 PS4 HID control and output reports to the GIMX application. Successful compilation does not prove PS4 authentication, device enumeration, report correctness or force feedback. Those require captures and hardware checks with a real G29, adapter and console.
 
