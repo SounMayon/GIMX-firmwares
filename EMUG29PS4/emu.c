@@ -34,15 +34,55 @@ void EVENT_USB_Device_ControlRequest(void) {
 
                 switch (reportId) {
                 case 0xf1:
-                case 0xf2:
-                    spoofReply = 0;
-                    send_spoof_header();
-                    while (!spoofReply)
-                        ;
-                    Endpoint_ClearSETUP();
-                    Endpoint_Write_Control_Stream_LE(buf, spoofReplyLen);
-                    Endpoint_ClearOUT();
-                    break;
+case 0xf2:
+{
+    uint32_t start;
+
+    if (USB_ControlRequest.wLength > sizeof(buf))
+    {
+        Endpoint_StallTransaction();
+        break;
+    }
+
+    spoofReply = 0;
+    spoofReplyLen = 0;
+    spoofWaiting = 1;
+
+    send_spoof_header();
+
+    start = system_millis();
+
+    while (!spoofReply &&
+           (uint32_t)(system_millis() - start) < SPOOF_REPLY_TIMEOUT_MS)
+    {
+        /* The UART interrupt receives the PC response. */
+    }
+
+    if (!spoofReply ||
+        spoofReplyLen > sizeof(buf) ||
+        spoofReplyLen > USB_ControlRequest.wLength)
+    {
+        spoofWaiting = 0;
+        spoofReply = 0;
+        spoofReplyLen = 0;
+
+        Endpoint_StallTransaction();
+        break;
+    }
+
+    spoofWaiting = 0;
+
+    Endpoint_ClearSETUP();
+
+    Endpoint_Write_Control_Stream_LE(buf, spoofReplyLen);
+
+    Endpoint_ClearOUT();
+
+    spoofReply = 0;
+    spoofReplyLen = 0;
+
+    break;
+}
                 case 0x03:
                     feature = buf03;
                     len = sizeof(buf03);
