@@ -62,6 +62,34 @@ static uint8_t buf[MAX_CONTROL_TRANSFER_SIZE];
 static uint8_t *pdata;
 static uint8_t i = 0;
 
+static bool packet_length_valid(uint8_t type, uint8_t length)
+{
+    switch (type)
+    {
+    case BYTE_TYPE:
+    case BYTE_STATUS:
+    case BYTE_START:
+    case BYTE_RESET:
+    case BYTE_VERSION:
+        return length == 0;
+
+    case BYTE_IDS:
+        return length == 4;
+
+    case BYTE_BAUDRATE:
+        return length == 0 || length == 1;
+
+    case BYTE_CONTROL_DATA:
+        return length > 0 && length <= sizeof(buf);
+
+    case BYTE_IN_REPORT:
+        return length <= sizeof(report);
+
+    default:
+        return false;
+    }
+}
+
 /*
  * These variables are used in both the main and serial interrupt,
  * therefore they have to be declared as volatile.
@@ -74,6 +102,7 @@ static volatile uint8_t value_len = 0;
 static volatile uint8_t spoofReply = 0;
 static volatile uint8_t spoofReplyLen = 0;
 static volatile uint8_t spoof_initialized = BYTE_STATUS_NSPOOFED;
+static volatile uint8_t spoofWaiting = 0;
 volatile uint16_t vid = 0;
 volatile uint16_t pid = 0;
 static volatile uint8_t baudrate = USART_BAUDRATE;
@@ -122,10 +151,14 @@ static inline void handle_packet(void) {
         Serial_SendByte(spoof_initialized);
         started = 1;
         break;
-    case BYTE_CONTROL_DATA:
-        spoofReply = 1;
+case BYTE_CONTROL_DATA:
+    if (spoofWaiting && value_len <= sizeof(buf))
+    {
         spoofReplyLen = value_len;
-        break;
+        spoofReply = 1;
+        spoofWaiting = 0;
+    }
+    break;
     case BYTE_RESET:
         forceHardReset();
         break;
@@ -189,14 +222,25 @@ ISR(USART1_RX_vect) {
     if (!Serial_WaitByte(&value_len)) {
         forceHardReset();
     }
-    pdata = (packet_type == BYTE_IN_REPORT) ? report : buf;
-    while (i < value_len) {
-        if (!Serial_WaitByte(pdata + (i++))) {
-            forceHardReset();
-        }
+if (!packet_length_valid(packet_type, value_len))
+{
+    forceHardReset();
+}
+
+pdata = (packet_type == BYTE_IN_REPORT) ? report : buf;
+
+while (i < value_len)
+{
+    if (!Serial_WaitByte(pdata + i))
+    {
+        forceHardReset();
     }
-    i = 0;
-    handle_packet();
+
+    i++;
+}
+
+i = 0;
+handle_packet();
 }
 
 void SetupHardware(void) {
