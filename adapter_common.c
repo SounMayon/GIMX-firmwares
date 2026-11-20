@@ -8,6 +8,8 @@
 
 #include <avr/wdt.h>
 #include <avr/power.h>
+#include <avr/interrupt.h>
+#include <avr/io.h>
 
 #include <LUFA/Drivers/USB/USB.h>
 #include <LUFA/Drivers/Peripheral/Serial.h>
@@ -51,6 +53,9 @@
 
 #define USART_BAUDRATE 5 // 500Kbps
 #define USART_DOUBLE_SPEED true
+
+#define SPOOF_REPLY_TIMEOUT_MS 200U
+
 
 const uint8_t version_major = 8;
 const uint8_t version_minor = 0;
@@ -103,9 +108,38 @@ static volatile uint8_t spoofReply = 0;
 static volatile uint8_t spoofReplyLen = 0;
 static volatile uint8_t spoof_initialized = BYTE_STATUS_NSPOOFED;
 static volatile uint8_t spoofWaiting = 0;
+static volatile uint32_t system_millis_counter = 0;
 volatile uint16_t vid = 0;
 volatile uint16_t pid = 0;
 static volatile uint8_t baudrate = USART_BAUDRATE;
+
+ISR(TIMER0_COMPA_vect)
+{
+    system_millis_counter++;
+}
+
+static void system_timer_init(void)
+{
+    /* Timer0 CTC mode, 1 ms at 16 MHz with prescaler 64. */
+    TCCR0A = (1 << WGM01);
+    TCCR0B = (1 << CS01) | (1 << CS00);
+
+    OCR0A = (F_CPU / 64UL / 1000UL) - 1;
+
+    TIMSK0 |= (1 << OCIE0A);
+}
+
+static uint32_t system_millis(void)
+{
+    uint32_t value;
+    uint8_t saved_sreg = SREG;
+
+    cli();
+    value = system_millis_counter;
+    SREG = saved_sreg;
+
+    return value;
+}
 
 void forceHardReset(void) {
     cli(); // disable interrupts
@@ -256,6 +290,7 @@ void SetupHardware(void) {
 
     UCSR1B |= (1 << RXCIE1); // Enable the USART Receive Complete interrupt (USART_RXC)
 
+    system_timer_init();
     GlobalInterruptEnable();
 
     while (!started) {}
