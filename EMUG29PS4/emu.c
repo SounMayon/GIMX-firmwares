@@ -68,12 +68,25 @@ void EVENT_USB_Device_ControlRequest(void) {
         break;
     case REQ_SetReport:
         if (USB_ControlRequest.bmRequestType == (REQDIR_HOSTTODEVICE | REQTYPE_CLASS | REQREC_INTERFACE)) {
-            Endpoint_ClearSETUP();
-            Endpoint_Read_Control_Stream_LE(buffer, USB_ControlRequest.wLength);
-            Endpoint_ClearIN();
+         uint8_t reportType = USB_ControlRequest.wValue >> 8;
+         uint8_t reportId = USB_ControlRequest.wValue & 0xff;
 
-            uint8_t reportType = USB_ControlRequest.wValue >> 8;
-            uint8_t reportId = USB_ControlRequest.wValue & 0xff;
+         /* Never read more data than the local buffer can hold. */
+         if (USB_ControlRequest.wLength > sizeof(buffer))
+         { 
+          Endpoint_StallTransaction();
+          break;
+         }
+
+         Endpoint_ClearSETUP();
+
+        if (Endpoint_Read_Control_Stream_LE(buffer,USB_ControlRequest.wLength) != ENDPOINT_RWSTREAM_NoError)
+        {
+         Endpoint_StallTransaction();
+         break;
+        }
+
+        Endpoint_ClearIN();
 
             if (reportType == REPORT_TYPE_FEATURE) {
                 switch (reportId) {
