@@ -129,7 +129,7 @@ static void system_timer_init(void)
     TIMSK0 |= (1 << OCIE0A);
 }
 
-static uint32_t system_millis(void)
+static inline uint32_t system_millis(void)
 {
     uint32_t value;
     uint8_t saved_sreg = SREG;
